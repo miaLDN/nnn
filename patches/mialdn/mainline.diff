@@ -1,0 +1,21 @@
+diff --git a/src/nnn.c b/src/nnn.c
+index 2acd4b49..28ee2160 100644
+--- a/src/nnn.c
++++ b/src/nnn.c
+@@ -743,7 +743,15 @@ static const char * const messages[] = {
+ 	"['l's]/'o'pen/e'x'tract/'m'nt?",
+ 	"keys:",
+ 	"invalid regex",
+-	"'a'u/'d'u/'e'xt/'r'ev/'s'z/'t'm/'v'er/'c'lr/'^T'?",
++    "a:pprnt-du/"
++        "d:du/"
++        "e:xt/"
++        "r:ev/"
++        "s:ize/"
++        "t:mod/"
++        "v:er/"
++        "c:lr/"
++        "^T:⥁{name,size,time}",
+ 	"unmount failed! try lazy?",
+ 	"first file (\')/char?",
+ 	"remove tmp file?",

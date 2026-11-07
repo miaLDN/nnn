@@ -6,7 +6,8 @@
 <a href="https://circleci.com/gh/jarun/workflows/nnn"><img src="https://img.shields.io/circleci/project/github/jarun/nnn.svg?label=CircleCI" alt="Circle CI Status" /></a>
 <a href="https://github.com/jarun/nnn/actions"><img src="https://github.com/jarun/nnn/actions/workflows/ci.yml/badge.svg?branch=master" alt="GitHub CI Status" /></a>
 <a href="https://en.wikipedia.org/wiki/Privacy-invasive_software"><img src="https://img.shields.io/badge/privacy-✓-crimson?maxAge=2592000" alt="Privacy Awareness" /></a>
-<a href="https://github.com/jarun/nnn/blob/master/LICENSE"><img src="https://img.shields.io/badge/©-BSD%202--Clause-important.svg?maxAge=2592000" alt="License" /></a>
+<a href="https://github.com/jarun/nnn/blob/master/LICENSE"><img src="https://img.shields.io/badge/⚖-BSD%202--Clause-important.svg?maxAge=2592000" alt="License" /></a>
+<a href="https://github.com/sponsors/jarun" target="_blank"><img src="https://img.shields.io/badge/sponsor-nnn-deeppink.svg" alt="GitHub Sponsors"></a>
 </p>
 
 <p align="center"><a href="https://github.com/user-attachments/assets/541ca36d-ae26-49fb-97da-d1f7a12d4b9a"><img src="https://github.com/user-attachments/assets/a8ee4689-1552-4fb1-997e-b16fe8ef5086"></a></p>
@@ -142,10 +143,9 @@ Don't memorize! Arrows, <kbd>/</kbd>, <kbd>q</kbd> suffice. <kbd>Tab</kbd> creat
 - [nnn file manager on Termux (Android)](https://www.youtube.com/embed/AbaauM7gUJw)
 - [NNN File Manager](https://www.youtube.com/embed/1QXU4XSqXNo)
 - [This Week in Linux 114 - TuxDigital](https://www.youtube.com/watch?v=5W9ja0DQjSY&t=2059s)
-- [nnn file manager basics - Linux](https://www.youtube.com/embed/il2Fm-KJJfM)
 - [I'M GOING TO USE THE NNN FILE BROWSER! 😮](https://www.youtube.com/embed/U2n5aGqou9E)
 - [NNN: Is This Terminal File Manager As Good As People Say?](https://www.youtube.com/embed/KuJHo-aO_FA)
-- [nnn - A File Manager (By Uoou, again.)](https://www.youtube.com/embed/cnzuzcCPYsk)
+- [Checkmate, GUI users. | 4P](https://youtu.be/5nBQshNBsV0?si=0mXEzCjGXgIv0Wo9)
 
 ## Elsewhere
 

@@ -75,7 +75,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fts.h>
 #include <libgen.h>
 #include <limits.h>
 #ifndef NOLC
@@ -843,15 +842,13 @@ static const char * const toks[] = {
 #define P_CPMVFMT 0
 #define P_CPMVRNM 1
 #define P_ARCHIVE 2
-#define P_REPLACE 3
-#define P_ARCHIVE_CMD 4
+#define P_ARCHIVE_CMD 3
 
 static const char * const patterns[] = {
 	SED" -i 's|^\\(\\(.*/\\)\\(.*\\)$\\)|#\\1\\n\\3|' '%s'",
 	SED" 's|^\\([^#/][^/]\\?.*\\)$|%s/\\1|;s|^#\\(/.*\\)$|\\1|' "
 		"'%s' | tr '\\n' '\\0' | xargs -0 -n2 sh -c '%s \"$0\" \"$@\" < /dev/tty'",
 	"\\.(bz|bz2|gz|tar|taz|tbz|tbz2|tgz|tzst|z|zip|zst)$", /* Basic formats that don't need external tools */
-	SED" -i 's|^%s\\(.*\\)$|%s\\1|' '%s'",
 	"xargs -0 %s %s < %s",
 };
 
@@ -2166,10 +2163,6 @@ static void rmtmpfile(void)
 
 static void endselection(bool endselmode)
 {
-	int fd;
-	ssize_t count;
-	char buf[sizeof(patterns[P_REPLACE]) + PATH_MAX + (TMP_LEN_MAX << 1)];
-
 	if (endselmode && g_state.selmode)
 		g_state.selmode = 0;
 
@@ -2177,51 +2170,49 @@ static void endselection(bool endselmode)
 	if (!listpath || !selbufpos)
 		return;
 
-	fd = create_tmp_file();
-	if (fd == -1) {
-		DPRINTF_S("couldn't create tmp file");
-		return;
-	}
+	size_t len, alloclen = 0, prefixlen = xstrlen(listroot), initlen = xstrlen(listpath);
+	char *pbuf = pselbuf, *end = pselbuf + selbufpos, *buf, *dst;
 
-	seltofile(fd, NULL, NEWLINE);
-	if (close(fd)) {
-		DPRINTF_S(strerror(errno));
-		printwarn(NULL);
-		return;
-	}
-
-	snprintf(buf, sizeof(buf), patterns[P_REPLACE], listpath, listroot, g_tmpfpath);
-	spawn_sh_exec(buf);
-
-	fd = open(g_tmpfpath, O_RDONLY);
-	if (fd == -1) {
-		DPRINTF_S(strerror(errno));
-		printwarn(NULL);
-		rmtmpfile();
-		return;
-	}
-
-	count = read(fd, pselbuf, selbuflen);
-	if (count < 0) {
-		DPRINTF_S(strerror(errno));
-		printwarn(NULL);
-		if (close(fd) || unlink(g_tmpfpath)) {
-			DPRINTF_S(strerror(errno));
+	/* Size the translated selection before replacing any paths. */
+	while (pbuf < end) {
+		len = xstrlen(pbuf) + 1;
+		if (is_prefix(pbuf, listpath, initlen)
+		    && (pbuf[initlen] == '/' || pbuf[initlen] == '\0'))
+			len = len - initlen + prefixlen;
+		if (len > UINT_MAX - alloclen) {
+			errno = ENOMEM;
+			errexit();
 		}
-		return;
+		alloclen += len;
+		pbuf += xstrlen(pbuf) + 1;
 	}
 
-	if (close(fd) || unlink(g_tmpfpath)) {
-		DPRINTF_S(strerror(errno));
-		printwarn(NULL);
+	if (!alloclen)
 		return;
+
+	buf = malloc(alloclen);
+	if (!buf)
+		errexit();
+
+	/* Keep filesystem names literal and preserve the NUL separators. */
+	for (pbuf = pselbuf, dst = buf; pbuf < end; pbuf += len) {
+		len = xstrlen(pbuf) + 1;
+		if (is_prefix(pbuf, listpath, initlen)
+		    && (pbuf[initlen] == '/' || pbuf[initlen] == '\0')) {
+			memcpy(dst, listroot, prefixlen); // NOLINT
+			dst += prefixlen;
+			memcpy(dst, pbuf + initlen, len - initlen);
+			dst += len - initlen;
+		} else {
+			memcpy(dst, pbuf, len);
+			dst += len;
+		}
 	}
 
-	selbufpos = count;
-	pselbuf[--count] = '\0';
-	for (--count; count > 0; --count)
-		if (pselbuf[count] == '\n' && pselbuf[count+1] == '/')
-			pselbuf[count] = '\0';
+	free(pselbuf);
+	pselbuf = buf;
+	selbufpos = selbuflen = alloclen;
+	findselpos = NULL;
 
 	writesel(pselbuf, selbufpos - 1);
 }
@@ -2866,6 +2857,18 @@ static bool cpmv_rename(int choice, const char *path)
 		spawn_sh_exec(buf);
 
 		count = entries_in_file(fd, buf, sizeof(buf), NEWLINE_CHAR);
+		/* External selections may not end with a NUL, so tr leaves the last
+		 * path without a newline and entries_in_file() does not count it.
+		 */
+		if (lseek(fd, -1, SEEK_END) != -1) {
+			if (read(fd, buf, 1) != 1)
+				goto finish;
+			if (buf[0] != NEWLINE_CHAR) {
+				if (write(fd, NEWLINE, 1) != 1)
+					goto finish;
+				++count;
+			}
+		}
 		if (!count)
 			goto finish;
 	} else
@@ -3177,15 +3180,16 @@ cleanup:
 
 static void write_lastdir(const char *curpath, const char *outfile)
 {
-	bool tilde = false, ok = false;
-	if (!outfile)
-		xstrsncpy(cfgpath + xstrlen(cfgpath), "/.lastd", 8);
+	bool use_g_buf = false, ok = false;
+	if (!outfile) {
+		mkpath(cfgpath, ".lastd", g_buf);
+		use_g_buf = true;
+	}
 	else
-		tilde = convert_tilde(outfile, g_buf);
+		use_g_buf = convert_tilde(outfile, g_buf);
 
-	int fd = open(outfile
-			? (tilde ? g_buf : outfile)
-			: cfgpath, O_CREAT | O_WRONLY | O_TRUNC, S_IWUSR | S_IRUSR);
+	int fd = open(use_g_buf ? g_buf : outfile,
+			O_CREAT | O_WRONLY | O_TRUNC, S_IWUSR | S_IRUSR);
 	if (fd >= 0) {
 		char *bufptr = g_buf;
 		size_t buflen = sizeof(g_buf) - 3;
@@ -6974,7 +6978,6 @@ static void dentfree(void)
 	free(du_tasks);
 }
 
-/* Walk a directory tree using readdir to reduce FTS overhead */
 static void du_pending_inc(du_group *group, bool inc_pending)
 {
 	if (inc_pending) {
@@ -7605,13 +7608,35 @@ static void populate(char *path, char *lastname)
 }
 
 #ifndef NOFIFO
+static int open_fifo(void)
+{
+	int flags = O_WRONLY | O_NONBLOCK | O_CLOEXEC;
+	struct stat sb;
+
+#ifdef O_NOFOLLOW
+	flags |= O_NOFOLLOW;
+#endif
+
+	int fd = open(fifopath, flags);
+	if (fd == -1)
+		return -1;
+
+	if (fstat(fd, &sb) == -1 || !S_ISFIFO(sb.st_mode)) {
+		close(fd);
+		errno = EINVAL;
+		return -1;
+	}
+
+	return fd;
+}
+
 static void notify_fifo(bool force)
 {
 	if (!fifopath)
 		return;
 
 	if (fifofd == -1) {
-		fifofd = open(fifopath, O_WRONLY|O_NONBLOCK|O_CLOEXEC);
+		fifofd = open_fifo();
 		if (fifofd == -1) {
 			if (errno != ENXIO)
 				/* Unexpected error, the FIFO file might have been removed */
@@ -7643,14 +7668,14 @@ static void notify_fifo(bool force)
 static void send_to_explorer(int *presel)
 {
 	if (nselected) {
-		int fd = open(fifopath, O_WRONLY|O_NONBLOCK|O_CLOEXEC, 0600);
+		int fd = open_fifo();
 		if ((fd == -1) || (seltofile(fd, NULL, NEWLINE) != (size_t)(selbufpos)))
 			printwarn(presel);
 		else {
 			resetselind();
 			clearselection();
 		}
-		if (fd > 1)
+		if (fd >= 0)
 			close(fd);
 	} else
 		notify_fifo(TRUE); /* Send opened path to NNN_FIFO */
@@ -10879,7 +10904,22 @@ int main(int argc, char *argv[])
 
 	fifopath = xgetenv("NNN_FIFO", NULL);
 	if (fifopath) {
-		if (mkfifo(fifopath, 0600) != 0 && !(errno == EEXIST && access(fifopath, W_OK) == 0)) {
+		struct stat sb;
+
+		if (mkfifo(fifopath, 0600) != 0 && errno != EEXIST) {
+			xerror();
+			return EXIT_FAILURE;
+		}
+		if (lstat(fifopath, &sb) != 0) {
+			xerror();
+			return EXIT_FAILURE;
+		}
+		if (!S_ISFIFO(sb.st_mode)) {
+			errno = EINVAL;
+			xerror();
+			return EXIT_FAILURE;
+		}
+		if (access(fifopath, W_OK) != 0) {
 			xerror();
 			return EXIT_FAILURE;
 		}

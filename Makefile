@@ -1,5 +1,6 @@
 VERSION = $(shell grep -m1 VERSION $(SRC) | cut -f 2 -d'"')
 
+#PREFIX ?= /volume1/homes/mia/.local
 PREFIX ?= /usr/local
 MANPREFIX ?= $(PREFIX)/share/man
 DESKTOPPREFIX ?= $(PREFIX)/share/applications
@@ -13,8 +14,8 @@ CFLAGS_OPTIMIZATION ?= -O3
 
 O_DEBUG := 0  # debug binary
 O_NORL := 1  # no readline support
-O_PCRE2 := 0  # link with PCRE2 library
-O_NOLC := 0  # no locale support
+O_PCRE2 := 1  # link with PCRE2 library
+O_NOLC := 1  # no locale support
 O_NOMOUSE := 0  # no mouse support
 O_NOBATCH := 0  # no built-in batch renamer
 O_NOFIFO := 0  # no FIFO previewer support
@@ -25,7 +26,7 @@ O_QSORT := 0  # use Alexey Tourbin's QSORT implementation
 O_BENCH := 0  # benchmark mode (stops at first user input)
 O_NOSSN := 0  # disable session support
 O_NOUG := 0  # disable user, group name in status bar
-O_NOX11 := 0  # disable X11 integration
+O_NOX11 := 1  # disable X11 integration
 O_NOSORT := 0  # disable sorting entries on dir load
 O_DIMFILTERED := 1  # dim characters matching filter (default: enabled)
 O_NOBRAILLE := 0  # braille support enabled by default
@@ -35,6 +36,7 @@ O_COLEMAK := 0 # change key bindings to colemak compatible layout
 O_GITSTATUS := 0 # add git status to detail view
 O_NAMEFIRST := 0 # print file name first, add uid and guid to detail view
 O_RESTOREPREVIEW := 0 # add preview pipe to close and restore preview pane
+O_MIALDN := 1 # add miaLDN's changes
 
 T_ICONS := 0 # test if multiple icons options are set and fail
 
@@ -188,6 +190,7 @@ LOGOSVG = misc/logo/logo.svg
 LOGO64X64 = misc/logo/logo-64x64.png
 
 COLEMAK = patches/colemak
+MIALDN = patches/mialdn
 GITSTATUS = patches/gitstatus
 NAMEFIRST = patches/namefirst
 RESTOREPREVIEW = patches/restorepreview
@@ -388,6 +391,9 @@ endif
 ifeq ($(strip $(O_COLEMAK)),1)
 	patch --forward $(PATCH_OPTS) --strip=1 --input=$(COLEMAK)/mainline.diff
 endif
+ifeq ($(strip $(O_MIALDN)),1)
+	patch --forward $(PATCH_OPTS) --strip=1 --input=$(MIALDN)/mainline.diff
+endif
 
 postpatch:
 ifeq ($(strip $(O_NAMEFIRST)),1)
@@ -403,6 +409,9 @@ ifeq ($(strip $(O_RESTOREPREVIEW)),1)
 endif
 ifeq ($(strip $(O_COLEMAK)),1)
 	patch --reverse $(PATCH_OPTS) --strip=1 --input=$(COLEMAK)/mainline.diff
+endif
+ifeq ($(strip $(O_MIALDN)),1)
+	patch --reverse $(PATCH_OPTS) --strip=1 --input=$(MIALDN)/mainline.diff
 endif
 
 skip: ;
